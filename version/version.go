@@ -17,6 +17,8 @@ package version
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -29,6 +31,7 @@ var (
 	buildStatus      = "unknown"
 	buildTag         = "unknown"
 	buildHub         = "unknown"
+	buildVendor      = "oss"
 )
 
 // BuildInfo describes version information about the binary build.
@@ -38,6 +41,8 @@ type BuildInfo struct {
 	GolangVersion string `json:"golang_version"`
 	BuildStatus   string `json:"status"`
 	GitTag        string `json:"tag"`
+	// Vendor denotes who built the image. Default is "istio.io".
+	Vendor        string `json:"vendor"`
 }
 
 // ServerInfo contains the version for a single control plane component
@@ -118,6 +123,33 @@ func (b BuildInfo) String() string {
 		b.BuildStatus)
 }
 
+// adjustCommand returns the last component of the
+// OS-specific command path for use in User-Agent.
+func adjustCommand(p string) string {
+	// Unlikely, but better than returning "".
+	if len(p) == 0 {
+		return "unknown"
+	}
+	return filepath.Base(p)
+}
+
+// UserAgent produces a UserAgent string that can be used to self
+// identify the istio binary.
+//
+// ```
+// u<binary_name>/<version> ($GOOS/$GOARCH) <vendor>
+// istioctl/1.11.2 (linux/amd64) istio/oss
+// istioctl/1.11.6 (darwin/amd64) istio/Google
+// ```
+func (b BuildInfo) UserAgent() string {
+	return fmt.Sprintf("%v/%v (%v/%v) istio/%v",
+		adjustCommand(os.Args[0]),
+		b.Version,
+		runtime.GOOS,
+		runtime.GOARCH,
+		b.Vendor)
+}
+
 // LongForm returns a dump of the Info struct
 // This looks like:
 //
@@ -132,6 +164,7 @@ func init() {
 		GolangVersion: runtime.Version(),
 		BuildStatus:   buildStatus,
 		GitTag:        buildTag,
+		Vendor:        buildVendor,
 	}
 
 	DockerInfo = DockerBuildInfo{
